@@ -11,7 +11,8 @@
 #   worklog.sh last-ts          timestamp of the newest entry (empty if none)
 set -u
 
-ATLAS_HOME="${ATLAS_HOME:-$HOME/.atlas}"
+# Installed scripts live in $ATLAS_HOME/bin, so home is one level up unless set.
+ATLAS_HOME="${ATLAS_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 ATLAS_STATE="${ATLAS_STATE:-$ATLAS_HOME/state}"
 LOG="$ATLAS_STATE/worklog.jsonl"
 
@@ -39,6 +40,7 @@ case "$cmd" in
     done
     summary="${1:-}"
     [ -n "$summary" ] || die "a summary is required"
+    [ $# -le 1 ] || die "quote the summary: got $# words, expected one argument"
     ts="$(date '+%Y-%m-%dT%H:%M:%S')"
     line="$(jq -cn --arg ts "$ts" --arg p "${project:-general}" --arg s "$summary" \
       --arg m "$missions" --arg f "$files" --arg src "$source" \
@@ -58,14 +60,17 @@ case "$cmd" in
   recent)
     n="${1:-5}"
     [ -s "$LOG" ] || { echo "  (worklog empty)"; exit 0; }
-    tail -n "$n" "$LOG" | jq -r '
-      "  \(.ts[5:16] | sub("T"; " ")) · \(.project): \(.summary)"
-      + (if (.missions | length) > 0 then " [\(.missions | join(","))]" else "" end)'
+    # Parse line by line and skip any that aren't valid entries, so one bad
+    # line can't hide the rest of the log.
+    tail -n "$n" "$LOG" | jq -rR '
+      fromjson? | select(type == "object" and (.ts | type) == "string")
+      | "  \(.ts[5:16] | sub("T"; " ")) · \(.project): \(.summary)"
+        + (if ((.missions // []) | length) > 0 then " [\(.missions | join(","))]" else "" end)'
     ;;
   since)
     ts="${1:?usage: worklog.sh since <ISO-ts>}"
     [ -f "$LOG" ] || exit 0
-    jq -c --arg t "$ts" 'select(.ts > $t)' "$LOG"
+    jq -cR --arg t "$ts" 'fromjson? | select(type == "object" and (.ts | type) == "string" and .ts > $t)' "$LOG"
     ;;
   last-ts)
     [ -s "$LOG" ] || exit 0

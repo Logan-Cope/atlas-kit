@@ -180,7 +180,71 @@ out="$("$ROOT/install.sh" --example)"
 has "$out" "skip skill wrap"
 eq "$(cat "$CLAUDE_CONFIG_DIR/skills/wrap/SKILL.md")" "mine"
 eq "$(jq -r '.missions[0].id' "$ATLAS_HOME/state/missions.json")" "keep-me"
+
+fresh "install --example keeps a leftover worklog when missions.json is missing"
+export CLAUDE_CONFIG_DIR="$TEST_HOME/claude"
+echo '{"ts":"2026-01-01T00:00:00","project":"mine","summary":"real entry"}' > "$ATLAS_STATE/worklog.jsonl"
+"$ROOT/install.sh" --example >/dev/null
+has "$(cat "$ATLAS_STATE/worklog.jsonl")" "real entry"
+eq "$(wc -l < "$ATLAS_STATE/worklog.jsonl" | tr -d ' ')" "1"
+
+fresh "install --hook refuses a settings.json that isn't JSON"
+export CLAUDE_CONFIG_DIR="$TEST_HOME/claude"
+mkdir -p "$CLAUDE_CONFIG_DIR"
+printf '{ "model": "x", // a comment\n}\n' > "$CLAUDE_CONFIG_DIR/settings.json"
+before="$(cksum "$CLAUDE_CONFIG_DIR/settings.json")"
+out="$("$ROOT/install.sh" --hook 2>&1)"; [ $? -ne 0 ] && ok || fail "bad settings accepted"
+lacks "$out" "hook added"
+eq "$(cksum "$CLAUDE_CONFIG_DIR/settings.json")" "$before"
+[ -z "$(find "$CLAUDE_CONFIG_DIR" -name 'settings.json.tmp.*')" ] && ok || fail "temp file left behind"
+
+fresh "install --hook keeps a symlinked settings.json a symlink"
+export CLAUDE_CONFIG_DIR="$TEST_HOME/claude"
+mkdir -p "$CLAUDE_CONFIG_DIR" "$TEST_HOME/dotfiles"
+echo '{"model":"x"}' > "$TEST_HOME/dotfiles/settings.json"
+ln -s "$TEST_HOME/dotfiles/settings.json" "$CLAUDE_CONFIG_DIR/settings.json"
+"$ROOT/install.sh" --hook >/dev/null
+[ -L "$CLAUDE_CONFIG_DIR/settings.json" ] && ok || fail "symlink replaced by a file"
+eq "$(jq '.hooks.SessionStart | length' "$TEST_HOME/dotfiles/settings.json")" "1"
+
+fresh "install works with spaces and & in ATLAS_HOME, and the hook runs"
+export ATLAS_HOME="$TEST_HOME/my home & co/.atlas" ATLAS_STATE="$TEST_HOME/my home & co/.atlas/state"
+export CLAUDE_CONFIG_DIR="$TEST_HOME/claude"
+"$ROOT/install.sh" --hook >/dev/null
+has "$(cat "$CLAUDE_CONFIG_DIR/skills/wrap/SKILL.md")" "'$ATLAS_HOME'/bin/worklog.sh"
+hookcmd="$(jq -r '.hooks.SessionStart[-1].hooks[0].command' "$CLAUDE_CONFIG_DIR/settings.json")"
+has "$(env -u ATLAS_HOME -u ATLAS_STATE HOME="$TEST_HOME/nohome" sh -c "$hookcmd" 2>&1)" "## Open missions"
+lacks "$("$ROOT/install.sh" 2>&1)" "skip skill"
 unset CLAUDE_CONFIG_DIR
+
+# ---------- review fixes ----------
+fresh "mission decision rebuilds the dashboard"
+"$BIN/mission.sh" add p "Decide things" >/dev/null
+"$BIN/mission.sh" decision decide-things "Chose plain files" "No server to run" >/dev/null
+has "$(cat "$ATLAS_HOME/dashboard/index.html")" "Chose plain files"
+
+fresh "mission ids never end in a dash"
+id="$("$BIN/mission.sh" add p "Thirty nine characters of title text ab cd")"
+eq "${id%-}" "$id"
+
+fresh "worklog add rejects an unquoted multi-word summary"
+"$BIN/worklog.sh" add --project p fixed the bug >/dev/null 2>&1; eq "$?" "2"
+[ ! -s "$ATLAS_STATE/worklog.jsonl" ] && ok || fail "partial summary written"
+
+fresh "one corrupt worklog line doesn't hide the others"
+with_example
+echo '{"ts": 5, "broken' >> "$ATLAS_STATE/worklog.jsonl"
+"$BIN/worklog.sh" add --project p "after the bad line" >/dev/null
+out="$("$BIN/worklog.sh" recent 3)"
+has "$out" "Docs sprint: pantry README"
+has "$out" "after the bad line"
+
+fresh "with only ATLAS_STATE set, the dashboard goes next to the state"
+export ATLAS_HOME="$TEST_HOME/unused" ATLAS_STATE="$TEST_HOME/proj/state"
+mkdir -p "$ATLAS_STATE"
+"$BIN/mission.sh" add p "Where does it go" >/dev/null
+[ -f "$TEST_HOME/proj/dashboard/index.html" ] && ok || fail "dashboard not next to state"
+[ ! -e "$TEST_HOME/unused" ] && ok || fail "wrote under ATLAS_HOME"
 
 # ---------- python ----------
 CURRENT="python dashboard tests"

@@ -6,7 +6,8 @@
 # which fleet batches are still running. It must never fail a session start,
 # so every step degrades to printing nothing.
 
-ATLAS_HOME="${ATLAS_HOME:-$HOME/.atlas}"
+# Installed scripts live in $ATLAS_HOME/bin, so home is one level up unless set.
+ATLAS_HOME="${ATLAS_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 ATLAS_STATE="${ATLAS_STATE:-$ATLAS_HOME/state}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 M="$ATLAS_STATE/missions.json"

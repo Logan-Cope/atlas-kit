@@ -34,7 +34,7 @@ def esc(value: object) -> str:
 
 def read_json(path: pathlib.Path) -> dict:
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(errors="replace"))
         return data if isinstance(data, dict) else {}
     except (OSError, ValueError):
         return {}
@@ -43,7 +43,7 @@ def read_json(path: pathlib.Path) -> dict:
 def read_jsonl(path: pathlib.Path) -> list[dict]:
     rows: list[dict] = []
     try:
-        lines = path.read_text().splitlines()
+        lines = path.read_text(errors="replace").splitlines()
     except OSError:
         return rows
     for line in lines:
@@ -58,7 +58,10 @@ def read_jsonl(path: pathlib.Path) -> list[dict]:
 
 def parse_ledger(path: pathlib.Path) -> dict:
     """A fleet ledger is markdown: a few header lines, then one task table."""
-    text = path.read_text()
+    try:
+        text = path.read_text(errors="replace")
+    except OSError:
+        return {"batch": path.stem, "title": path.stem, "tasks": []}
     tasks: list[dict] = []
     header: list[str] | None = None
     for line in text.splitlines():
@@ -189,6 +192,7 @@ TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Mission control for several Claude Code sessions: open missions, recent wraps, fleet batches and decisions, generated from plain state files.">
 <title>Mission control · atlas-kit</title>
+<link rel="icon" href="data:,">
 <style>
 :root {{
   color-scheme: light dark;
@@ -232,6 +236,7 @@ p {{ margin: 0; }}
 .empty {{ color: var(--muted); font-style: italic; }}
 .lower {{ display: grid; grid-template-columns: 3fr 2fr; gap: 24px; margin-bottom: 40px; }}
 @media (max-width: 900px) {{ .lower {{ grid-template-columns: 1fr; }} }}
+.lower > *, .board > * {{ min-width: 0; }}
 section.panel {{ margin-bottom: 30px; }}
 .batch {{ background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }}
 .scroll {{ overflow-x: auto; }}
@@ -277,7 +282,7 @@ footer a {{ color: inherit; }}
 
 
 def main() -> None:
-    home = pathlib.Path(os.environ.get("ATLAS_HOME", pathlib.Path.home() / ".atlas"))
+    home = pathlib.Path(os.environ.get("ATLAS_HOME", pathlib.Path(__file__).resolve().parent.parent))
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--state", type=pathlib.Path,
                     default=pathlib.Path(os.environ.get("ATLAS_STATE", home / "state")))

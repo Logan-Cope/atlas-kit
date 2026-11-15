@@ -17,11 +17,13 @@
 #   mission.sh decisions <id>                   read a mission's decisions
 set -euo pipefail
 
-ATLAS_HOME="${ATLAS_HOME:-$HOME/.atlas}"
+# Installed scripts live in $ATLAS_HOME/bin, so home is one level up unless set.
+ATLAS_HOME="${ATLAS_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 ATLAS_STATE="${ATLAS_STATE:-$ATLAS_HOME/state}"
 M="$ATLAS_STATE/missions.json"
 D="$ATLAS_STATE/decisions.jsonl"
 LOCK="$M.lock"
+DASHBOARD="$(dirname "$ATLAS_STATE")/dashboard/index.html"   # next to the state it shows
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 today="$(date '+%Y-%m-%d')"
 
@@ -52,6 +54,7 @@ write() {
   local filter="$1"; shift
   local tmp
   tmp="$(mktemp "$M.tmp.XXXXXX")"   # same directory, so mv is an atomic rename
+  chmod 644 "$tmp"                    # mktemp makes 0600; keep the file readable as before
   if jq --arg today "$today" "$@" "$filter | .updated = \$today" "$M" > "$tmp"; then
     mv "$tmp" "$M"
   else
@@ -63,7 +66,7 @@ exists() { jq -e --arg id "$1" 'any(.missions[]; .id == $id)' "$M" >/dev/null; }
 
 rebuild_dashboard() {
   python3 "$HERE/build-dashboard.py" --state "$ATLAS_STATE" \
-    --out "$ATLAS_HOME/dashboard/index.html" >/dev/null 2>&1 || true
+    --out "$DASHBOARD" >/dev/null 2>&1 || true
 }
 
 # set_fields <id> <jq object>: merge fields into one mission.
@@ -83,7 +86,7 @@ case "$cmd" in
   add)
     project="${1:?usage: mission.sh add <project> \"<title>\"}"
     title="${2:?usage: mission.sh add <project> \"<title>\"}"
-    id="$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//; s/-$//' | cut -c1-40)"
+    id="$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//' | cut -c1-40 | sed 's/-*$//')"
     [ -n "$id" ] || die "title needs at least one letter or digit"
     lock
     ! exists "$id" || die "mission already exists: $id"
@@ -108,7 +111,7 @@ case "$cmd" in
     line="$(jq -cn --arg ts "$(date '+%Y-%m-%dT%H:%M:%S')" --arg id "$id" --arg p "$project" \
       --arg w "$what" --arg y "$why" '{ts: $ts, mission: $id, project: $p, decision: $w, why: $y}')"
     printf '%s\n' "$line" >> "$D"
-    echo "decision logged on $id" ;;
+    rebuild_dashboard; echo "decision logged on $id" ;;
   decisions)
     id="${1:?id}"
     [ -s "$D" ] || { echo "  (no decisions logged)"; exit 0; }

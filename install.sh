@@ -32,31 +32,43 @@ mkdir -p "$ATLAS_HOME/bin" "$ATLAS_HOME/state" "$ATLAS_HOME/dashboard"
 cp "$SRC"/bin/*.sh "$SRC"/bin/*.py "$ATLAS_HOME/bin/"
 chmod +x "$ATLAS_HOME"/bin/*
 
-# 2. State: never touch state that already exists.
+# 2. State: never overwrite a state file that already exists.
 if [ ! -f "$ATLAS_HOME/state/missions.json" ]; then
   if [ "$example" = 1 ]; then
-    cp -R "$SRC/examples/state/." "$ATLAS_HOME/state/"
+    (cd "$SRC/examples/state" && find . -type f) | while IFS= read -r f; do
+      [ -e "$ATLAS_HOME/state/$f" ] && continue
+      mkdir -p "$(dirname "$ATLAS_HOME/state/$f")"
+      cp "$SRC/examples/state/$f" "$ATLAS_HOME/state/$f"
+    done
   else
     printf '{"updated":"","missions":[]}\n' > "$ATLAS_HOME/state/missions.json"
   fi
 fi
 mkdir -p "$ATLAS_HOME/state/fleet"
 
+# shell-quoted, so a path with spaces or & still works as a command
+shq() { python3 -c 'import shlex, sys; print(shlex.quote(sys.argv[1]))' "$1"; }
+
 # 3. Skills. They name ~/.atlas; point them at ATLAS_HOME if it lives elsewhere.
 mkdir -p "$CLAUDE_DIR/skills"
 for dir in "$SRC"/skills/*/; do
   name="$(basename "$dir")"
   dest="$CLAUDE_DIR/skills/$name"
-  if [ -e "$dest" ] && [ "$force" = 0 ] && ! diff -rq "$dir" "$dest" >/dev/null 2>&1; then
+  rendered="$(mktemp)"
+  if [ "$ATLAS_HOME" = "$HOME/.atlas" ]; then
+    cp "$dir/SKILL.md" "$rendered"
+  else
+    python3 -c 'import sys; s, o, h = sys.argv[1:]; open(o, "w").write(open(s).read().replace("~/.atlas", h))' \
+      "$dir/SKILL.md" "$rendered" "$(shq "$ATLAS_HOME")"
+  fi
+  if [ -e "$dest" ] && [ "$force" = 0 ] && ! cmp -s "$rendered" "$dest/SKILL.md"; then
     echo "skip skill $name: $dest exists (use --force to overwrite)"
+    rm -f "$rendered"
     continue
   fi
   mkdir -p "$dest"
-  if [ "$ATLAS_HOME" = "$HOME/.atlas" ]; then
-    cp "$dir/SKILL.md" "$dest/SKILL.md"
-  else
-    sed "s#~/\.atlas#$ATLAS_HOME#g" "$dir/SKILL.md" > "$dest/SKILL.md"
-  fi
+  mv "$rendered" "$dest/SKILL.md"
+  chmod 644 "$dest/SKILL.md"
   echo "skill /$name -> $dest"
 done
 
@@ -65,18 +77,27 @@ python3 "$ATLAS_HOME/bin/build-dashboard.py" --state "$ATLAS_HOME/state" \
   --out "$ATLAS_HOME/dashboard/index.html" >/dev/null
 
 # 5. SessionStart hook
-cmd="$ATLAS_HOME/bin/session-start.sh"
+cmd="$(shq "$ATLAS_HOME/bin/session-start.sh")"
 if [ "$hook" = 1 ]; then
   settings="$CLAUDE_DIR/settings.json"
-  [ -f "$settings" ] || echo '{}' > "$settings"
+  [ -e "$settings" ] || echo '{}' > "$settings"
+  jq empty "$settings" 2>/dev/null || {
+    echo "install: $settings is not valid JSON; hook not added. Add it by hand:" >&2
+    jq -n --arg cmd "$cmd" '{hooks: {SessionStart: [{hooks: [{type: "command", command: $cmd}]}]}}' >&2
+    exit 1
+  }
   cp "$settings" "$settings.bak.$(date +%Y%m%d%H%M%S)"
-  tmp="$(mktemp "$settings.tmp.XXXXXX")"
+  tmp="$(mktemp)"
   # Idempotent: drop any earlier copy of this hook, then add it once.
   jq --arg cmd "$cmd" '
     .hooks.SessionStart = (
       ((.hooks.SessionStart // []) | map(select(([.hooks[]?.command] | index($cmd)) | not)))
       + [{hooks: [{type: "command", command: $cmd}]}]
-    )' "$settings" > "$tmp" && mv "$tmp" "$settings"
+    )' "$settings" > "$tmp" || { rm -f "$tmp"; echo "install: jq failed; $settings unchanged" >&2; exit 1; }
+  # Write through the file rather than replacing it, so a symlinked
+  # settings.json (dotfiles) stays a symlink and keeps its permissions.
+  cat "$tmp" > "$settings"
+  rm -f "$tmp"
   echo "hook added to $settings (backup saved next to it)"
 else
   echo ""

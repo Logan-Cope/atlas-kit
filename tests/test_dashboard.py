@@ -66,6 +66,18 @@ class Hostile(unittest.TestCase):
         self.assertNotIn("<img src=x", page)
         self.assertIn("&quot; onmouseover=&quot;x", page)
 
+    def test_bad_bytes_and_bad_ledger_do_not_abort(self):
+        with tempfile.TemporaryDirectory() as d:
+            state = pathlib.Path(d)
+            (state / "worklog.jsonl").write_bytes(
+                b'{"ts":"2026-11-14T10:00:00","project":"p","summary":"caf\xe9 ok"}\n'
+                b'{"ts":"2026-11-14T11:00:00","project":"p","summary":"second"}\n')
+            (state / "fleet").mkdir()
+            (state / "fleet" / "b.md").write_bytes(b"| Task | Status |\n|---|---|\n| t\xff | running |\n")
+            page = dash.render(dash.load_state(state))
+        self.assertIn("second", page)
+        self.assertIn("b", page)
+
     def test_empty_state_renders(self):
         with tempfile.TemporaryDirectory() as d:
             page = dash.render(dash.load_state(pathlib.Path(d)))

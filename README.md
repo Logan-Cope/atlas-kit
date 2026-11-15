@@ -47,7 +47,7 @@ Install for real:
 ./install.sh --hook        # scripts to ~/.atlas, skills to ~/.claude/skills, hook into settings.json
 ```
 
-`--hook` backs up `~/.claude/settings.json` before adding the SessionStart hook, and running it twice adds it once. Leave it off and the installer prints the snippet to paste instead. `--example` starts you on the example state. Existing state and skills with the same names are never overwritten (`--force` overwrites the skills).
+State lives in `~/.atlas/state` (set `ATLAS_HOME` before installing to put it elsewhere). `--hook` backs up `~/.claude/settings.json` before adding the SessionStart hook, and running it twice adds it once. Leave it off and the installer prints the snippet to paste instead. `--example` starts you on the example state. Existing state and skills with the same names are never overwritten (`--force` overwrites the skills).
 
 Then, in any Claude Code session:
 
@@ -56,6 +56,8 @@ Then, in any Claude Code session:
 /wrap                       record what you just finished
 /fleet <three tasks>        run them as three sessions and check the results
 ```
+
+`/fleet` starts each child with `claude --bg` (or as a subagent when the task is small), tracks it in a ledger under `state/fleet/`, and re-runs the child's checks before marking it verified.
 
 ## The dashboard
 

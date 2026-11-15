@@ -4,7 +4,7 @@ atlas-kit has three layers: plain files that hold the state, small scripts that 
 
 ## The state spine
 
-Everything lives in one folder, `$ATLAS_STATE` (default `~/.atlas/state`).
+Everything lives in one folder, `$ATLAS_STATE`, which defaults to `$ATLAS_HOME/state`. `ATLAS_HOME` defaults to the folder above the scripts, which is `~/.atlas` after a normal install, so the hook and skills find the right state without any environment variable set. The dashboard is written next to the state, at `$ATLAS_STATE/../dashboard/index.html`.
 
 | File | Shape | Written by | Read by |
 |---|---|---|---|
@@ -60,6 +60,8 @@ flowchart TB
 3. runs a jq filter with every user value passed as `--arg`, never spliced into the filter,
 4. writes the result to a temp file in the same folder and `mv`s it over the original, so a reader never sees half a file,
 5. restamps `updated`, releases the lock, and rebuilds the dashboard.
+
+One known gap: clearing a stale lock isn't itself atomic. If a writer really did hold the lock for over a minute and two waiters reach the stale check at the same instant, two writers can briefly overlap. Writes take milliseconds, so this needs a hung process plus exact timing; a lock with process ids would close it at the cost of more code than the rest of the script.
 
 `mission.sh decision` appends to its own ledger instead, the same way the worklog does. It never touches `missions.json`, so logging a reason doesn't change a mission's `updated` date.
 
