@@ -1,0 +1,4 @@
+{"ts":"2026-11-09T10:15:02","mission":"search-index","project":"pantry","decision":"Plain inverted index in memory, no search service","why":"412 recipes fit in 300 KB; a hosted search adds a bill and a dependency for no measurable gain"}
+{"ts":"2026-11-11T09:50:13","mission":"elevation-profile","project":"trailmap","decision":"Marked done at 2% error, not 1%","why":"The 5 reference routes disagree with each other by about 2%, so tighter isn't measurable"}
+{"ts":"2026-11-13T11:33:40","mission":"gpx-import","project":"trailmap","decision":"Blocked rather than guessing the third format","why":"A parser written from a forum description would pass its own tests and fail on real files"}
+{"ts":"2026-11-14T09:06:30","mission":"docs-sprint","project":"general","decision":"Run the three READMEs as a fleet, one child each","why":"Each README is in its own repo, so the children can't write over each other"}

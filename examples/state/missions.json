@@ -1,0 +1,77 @@
+{
+  "updated": "2026-11-14",
+  "missions": [
+    {
+      "id": "unit-conversion-v2",
+      "title": "Scale recipes between metric and imperial without ugly fractions",
+      "project": "pantry",
+      "status": "in_progress",
+      "next_action": "Round anything under 1/8 tsp to 'a pinch', then cut v0.4",
+      "blocker": null,
+      "updated": "2026-11-14"
+    },
+    {
+      "id": "gpx-import",
+      "title": "Import GPX tracks from the three common watch exports",
+      "project": "trailmap",
+      "status": "blocked",
+      "next_action": "Parse elevation from <ele> and the extension tag, whichever is present",
+      "blocker": "No public sample file from the third exporter yet; asked in its forum",
+      "updated": "2026-11-13"
+    },
+    {
+      "id": "issue-14",
+      "title": "Write post 14: what a month of session logs taught me",
+      "project": "field-notes",
+      "status": "in_progress",
+      "next_action": "Second draft: cut the intro to two sentences, add the worklog chart",
+      "blocker": null,
+      "updated": "2026-11-12"
+    },
+    {
+      "id": "docs-sprint",
+      "title": "Bring every project README up to the same quickstart standard",
+      "project": "general",
+      "status": "in_progress",
+      "next_action": "Fleet batch 2026-11-14-docs-sprint running: 1 of 3 verified",
+      "blocker": null,
+      "updated": "2026-11-14"
+    },
+    {
+      "id": "offline-mode",
+      "title": "Let the recipe list work offline",
+      "project": "pantry",
+      "status": "backlog",
+      "next_action": "",
+      "blocker": null,
+      "updated": "2026-11-08"
+    },
+    {
+      "id": "rss-feed",
+      "title": "Add a full-text RSS feed",
+      "project": "field-notes",
+      "status": "backlog",
+      "next_action": "",
+      "blocker": null,
+      "updated": "2026-11-05"
+    },
+    {
+      "id": "elevation-profile",
+      "title": "Draw an elevation profile under each route",
+      "project": "trailmap",
+      "status": "done",
+      "next_action": "",
+      "blocker": null,
+      "updated": "2026-11-11"
+    },
+    {
+      "id": "search-index",
+      "title": "Search recipes by ingredient",
+      "project": "pantry",
+      "status": "done",
+      "next_action": "",
+      "blocker": null,
+      "updated": "2026-11-09"
+    }
+  ]
+}
