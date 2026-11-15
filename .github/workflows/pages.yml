@@ -21,7 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the dashboard from the example state
-        run: python3 bin/build-dashboard.py --state examples/state --out site/index.html --no-timestamp --note "Example state: three fictional projects and one fleet batch."
+        run: |
+          python3 bin/build-dashboard.py --state examples/state --out site/index.html \
+            --no-timestamp --note "Example state: three fictional projects and one fleet batch."
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }
